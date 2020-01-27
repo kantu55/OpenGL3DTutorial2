@@ -108,7 +108,7 @@ private:
 
 using CollisionHandlerType = 
 	std::function<void(const ActorPtr&, const ActorPtr&, const glm::vec3&)>;
-void DetectCollision(const ActorPtr& a, const ActorPtr& b, 
+void DetectCollision(const ActorPtr& a, const ActorPtr& b,
 	CollisionHandlerType handler = nullptr);
 void DetectCollision(const ActorPtr& a, ActorList& b,
 	CollisionHandlerType handler = nullptr);

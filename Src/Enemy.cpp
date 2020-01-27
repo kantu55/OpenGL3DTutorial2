@@ -17,15 +17,7 @@ EnemyActor::EnemyActor(const Terrain::HeightMap* hm, const Mesh::Buffer& buffer,
 	const glm::vec3& pos, const glm::vec3& rot)
 	: SkeletalMeshActor(buffer.GetSkeletalMesh("oni_small"), "Enemy", 13, pos, rot), heightMap(hm)
 {
-	colLocal = Collision::CreateSphere(glm::vec3(0, 0.7f, 0), 0.7f);
-	mass m;
-	const glm::vec3 massStartPos = glm::vec3(leftWall, 0, backWall);
-	const float rightWall = 115.0f;
-	const float leftWall = 85.0f;
-	const float forwordWall = 100.0f;
-	const float backWall = 70.0f;
-	const float mapSizeX_min = rightWall - leftWall;
-	const float mapSizeZ_min = forwordWall - backWall;
+	colLocal = Collision::CreateSphere(glm::vec3(0, 0.7f, 0), 0.8f);
 }
 
 void EnemyActor::TargetActor(const ActorPtr& target)
@@ -46,12 +38,52 @@ void EnemyActor::ObjectActor(const StaticMeshActorPtr object)
 	return;
 }
 
-/*
-更新
+bool EnemyActor::NearPlayer()
+{
+	if (targetLength <= 1.5f)
+	{
+		return true;
+	}
+	return false;
+}
 
-@param deltaTime 経過時間
-*/
-void EnemyActor::Update(float deltaTime)
+bool EnemyActor::RayChack(glm::vec3 front, int seenLength)
+{
+	float objectMinScale = 10.0f;
+	for (int i = 0; i < 3; i++)
+	{
+		float RotationY = rotation.y;
+		float x = -1;
+		x += i;
+		bool wallFrag = false;
+		front = glm::rotate(glm::mat4(1), RotationY,
+			glm::vec3(0, 1, 0)) * glm::vec4(x, 0, 1, 1);
+		for (int j = 0; j < seenLength; j++)
+		{
+			front = glm::rotate(glm::mat4(1), RotationY,
+				glm::vec3(0, 1, 0)) * glm::vec4(x, 0, j, 1);
+			front += position;
+			front.y = heightMap->Height(front);
+			for (auto& object : obstacle)
+			{
+				float targetDistance = glm::length(targetActor->position - front);
+				const glm::vec3 distance = ObjectChack(object, front);
+				if (glm::length(distance) <= 0.5f)
+				{
+					wallFrag = true;
+				}
+				else if (targetDistance < 1.0f && !wallFrag)
+				{
+					seenPos = targetActor->position;
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+void EnemyActor::PlayerInfo()
 {
 	// targetはプレイヤー
 	targetVector = targetActor->position - position; // ベクトル
@@ -59,20 +91,14 @@ void EnemyActor::Update(float deltaTime)
 	targetLength = glm::length(targetVector); // ベクトルを長さに変更（コリジョンで1.45以内はいけない）
 	targetDot = glm::dot(glm::normalize(position), glm::normalize(targetVector)); // プレイヤーと敵(自身)の内積
 	targetRadian = std::atan2(-targetNormalize.x, targetNormalize.z); // プレイヤーと敵(自身)の角度
-	//target = targetDot * (180 / 3.14);
-	
-	// 座標の更新
-	SkeletalMeshActor::Update(deltaTime);
-	
-	if (attackCollision)
-	{
-		attackCollision->Update(deltaTime);
-	}
+}
 
+void EnemyActor::Outside()
+{
 	// 見えない壁判定
 	if (position.x > rightWall || position.x < leftWall || position.z > forwordWall || position.z < backWall)
 	{
-		velocity = wait;
+		velocity = glm::vec3(0);
 		if (position.x > rightWall)
 		{
 			position.x = rightWall;
@@ -89,94 +115,32 @@ void EnemyActor::Update(float deltaTime)
 		{
 			position.z = backWall;
 		}
-		// ステートを待機に強制変更
-		state = State::wait;
-		waitTimer = 2.0f;
-		isAnimation = false;
-		task = Task::end;
 	}
+}
 
-	// 接地判定
-	static const float gravity = 0.0f;
-	const float groundHeight = heightMap->Height(position);
-	if (position.y <= groundHeight)
-	{
-		position.y = groundHeight;
-		velocity.y = 0;
-	}
-	else if (position.y > groundHeight)
-	{
-		// 乗っている物体から離れたら空中判定にする
-		if (boardingActor)
-		{
-			Collision::Shape col = colWorld;
-			col.s.r += 0.1f; // 衝突判定を少し大きくする
-			glm::vec3 pa, pb;
-			if (!Collision::TestShapeShape(col, boardingActor->colWorld, &pa, &pb))
-			{
-				boardingActor.reset();
-			}
-		}
-		// 落下判定
-		const bool isFloating = position.y > groundHeight + 0.1f; // 地面から浮いているか
-	}
+/*
+更新
 
+@param deltaTime 経過時間
+*/
+void EnemyActor::Update(float deltaTime)
+{
 	if (health <= 0)
 		return;
+	PlayerInfo();
 
-	// タスクの更新
-	switch (state)
+	front = glm::rotate(glm::mat4(1), rotation.y,
+		glm::vec3(0, 1, 0)) * glm::vec4(0, 0, 1, 1);
+	
+	// 座標の更新
+	SkeletalMeshActor::Update(deltaTime);
+	
+	if (attackCollision)
 	{
-	case EnemyActor::State::wait:
-
-		if (Wait(deltaTime))
-		{
-			//プレイヤーが視認できているかでタスクが切り替わる
-			if (task == Task::end)
-			{
-				task = Task::reserve;
-				if (!SeenTo(targetLength, targetRadian))
-				{
-					state = State::patrol;
-				}
-				if (SeenTo(targetLength, targetRadian))
-				{
-					state = State::patrol;
-				}
-			}
-		}
-		break;
-
-	case EnemyActor::State::round:
-		if (Round())
-		{
-			state = State::wait;
-		}
-		break;
-
-	case EnemyActor::State::patrol:
-		if (Patrol())
-		{
-			state = State::wait;
-		}
-		break;
-
-	case EnemyActor::State::approach:
-		if (Approach())
-		{
-			state = State::attack;
-		}
-		break;
-
-	case EnemyActor::State::attack:
-		attackTimer += deltaTime;
-		
-		if (Attack(deltaTime))
-		{
-			state = State::wait;
-		}
-		break;
+		attackCollision->Update(deltaTime);
 	}
+
+	
 }
 
 /*
@@ -198,13 +162,29 @@ bool EnemyActor::Wait(float deltaTime)
 	}
 
 	// 視界にプレイヤーが見えたらタスク終了
-	if (SeenTo(targetLength, targetRadian))
+	if (RayChack(front, 6) && !vigilanceMode)
 	{
-		state = State::approach;
+		vigilanceMode = false;
+		discovery = true;
+		velocity = glm::vec3(0);
+		state = State::vigilance;
 		task = Task::reserve;
+		isAnimation = false;
 		return false;
 	}
-	
+
+	if (NearPlayer())
+	{
+		vigilanceMode = false;
+		discovery = true;
+		state = State::attack;
+		nodePoint = 0;
+		moveCount = 0;
+		isAnimation = false;
+		task = Task::end;
+		return false;
+	}
+
 	// 待機時間が終了したらタスク終了
 	if (waitTimer <= 0 && task == Task::start)
 	{
@@ -216,284 +196,12 @@ bool EnemyActor::Wait(float deltaTime)
 }
 
 /*
-周回
-*/
-bool EnemyActor::Round()
-{
-	// タスクの初期化
-	if (task == Task::reserve)
-	{
-		roundPoint = 0;
-		patrolGoalPos = roundPoints[roundPoint];
-		patrolGoalPos.y = position.y;
-		task = Task::start;
-	}
-	// アニメーションの変更
-	if (!isAnimation)
-	{
-		GetMesh()->Play("Run");
-		isAnimation = true;
-	}
-
-	// 視界にプレーヤーが見えたらタスク終了
-	if (SeenTo(targetLength, targetRadian))
-	{
-		state = State::approach;
-		task = Task::reserve;
-		return false;
-	}
-	
-	if (roundPoint == 3 &&
-		NeraEquivalent(position, patrolGoalPos, nearGoal))
-	{
-		waitTimer = 2.0f;
-		velocity = glm::vec3(0);
-		task = Task::end;
-		isAnimation = false;
-		return true;
-	}
-	else if (NeraEquivalent(position, patrolGoalPos, nearGoal))
-	{
-		++roundPoint;
-		patrolGoalPos = roundPoints[roundPoint];
-		patrolGoalPos.y = position.y;
-		return false;
-	}
-	// ゴールまで移動
-	else
-	{
-		glm::vec3 move = patrolGoalPos - position;
-		if (glm::dot(move, move))
-		{
-			// 向きを更新
-			move = glm::normalize(move);
-			rotation.y = std::atan2(-move.z, move.x) + glm::radians(90.0f);
-		}
-		velocity = move * moveSpeed;
-		return false;
-	}
-}
-
-/*
-巡回
-*/
-bool EnemyActor::Patrol()
-{
-	Astar astar;
-	// タスクの初期化
-	if (task == Task::reserve)
-	{
-		astar.open.index = 0;
-		astar.close.index = 0;
-		for (x = leftWall; x < ARRAY_NUM(map); x++)
-		{
-			for (z = backWall; z <= forwordWall; z++)
-			{
-				const int targetPosition_x = targetActor->position.x;
-				const int targetPosition_z = targetActor->position.z;
-				if (x == targetPosition_x && z == targetPosition_z)
-				{
-					map[x][z] = glm::vec3(targetPosition_x, position.y, targetPosition_z);
-					startPos = map[x][z];
-					astar.s.x = x;
-					astar.s.z = z;
-					// スタートノードをオープンリストに追加
-					astar.open.node[astar.open.index++] = &astar.s;
-					// クローズリストは空にする
-					astar.close.node[astar.close.index++] = NULL;
-					patrolGoalPos = glm::vec3(astar.s.x, position.y, astar.s.z);
-				}
-				const int Position_x = position.x;
-				const int Position_z = position.z;
-				if (x == Position_x && z == Position_z)
-				{
-					map[x][z] = glm::vec3(Position_x, position.y, Position_z);
-					goalPos = map[x][z];
-					astar.e.x = x;
-					astar.e.z = z;
-				}
-			}
-		}
-		task = Task::start;
-	}
-	// アニメーションの変更
-	if (!isAnimation)
-	{
-		GetMesh()->Play("Run");
-		isAnimation = true;
-	}
-	// 視界にプレーヤーが見えたらタスク終了
-	if (SeenTo(targetLength, targetRadian))
-	{
-		//state = State::approach;
-		//task = Task::reserve;
-		//return false;
-	}
-	if (nodePoint == 0)
-	{
-		while (1)
-		{
-			Astar::NODE *n = NULL;
-			for (x = 0; x < astar.open.index; x++)
-			{
-				if (astar.open.node[x] != NULL)
-				{
-					int cost = astar.G(&astar.s, astar.open.node[x]);
-					if (n == NULL || n->cost > cost)
-					{
-						glm::vec3 chackMap = glm::vec3(astar.open.node[x]->x,
-							position.y, astar.open.node[x]->z);
-						chackMap.y = heightMap->Height(chackMap);
-						
-						bool chack = false;
-						int scale_x = objects->colLocal.obb.e.x;
-						int scale_z = objects->colLocal.obb.e.z;
-						o[0] = { objects->position + glm::vec3(-scale_x, 0, -scale_z) };
-						for (int i = 0; i < (scale_x*2)+1; ++i)
-						{
-							if (scale_z <= 0)
-							{
-								o[i] = o[0] + glm::vec3(i, 0, 0);
-								o[i].y = heightMap->Height(o[i]);
-								if (chackMap == o[i])
-								{
-									chack = true;
-								}
-							}
-							else
-							{
-								for (int j = 0; j < (scale_z*2)+1; j++)
-								{
-									o[i + j] = o[0] + glm::vec3(i, 0, j);
-									o[i + j].y = heightMap->Height(o[i + j]);
-									if (chackMap == o[i + j])
-									{
-										chack = true;
-									}
-								}
-							}
-						}
-						if (!chack)
-						{
-							// ノードの中で一番最小のコストを得る
-							n = astar.open.node[x];
-						}
-						else
-						{
-							printf("障害物\n");
-						}						
-						astar.open.node[x] = NULL;
-					}
-				}
-			}
-			// openからリストがなくなったので終了する
-			if (n == NULL)
-			{
-				printf("no goal...\n");
-				return true;
-			}
-			map[n->x][n->z] = glm::vec3(n->x, position.y, n->z);
-			//printf("%.0f , %.0f\n", map[n->x][n->z].x, map[n->x][n->z].z);
-
-			if (map[n->x][n->z] == goalPos)
-			{
-				printf("OK goal!!!\n");
-				printf("PlayerPos  : %.0f , %.0f\n", targetActor->position.x, targetActor->position.z);
-				//printf("StartNode : %.0f , %.0f\n", startPos.x, startPos.z);
-				n = n->parent;
-				while (n->parent != NULL)
-				{
-					nodePos[nodePoint] = map[n->x][n->z];
-					nodePoint++;
-					printf("%.0f , %.0f\n", map[n->x][n->z].x, map[n->x][n->z].z);
-					n = n->parent;
-				}
-				astar.s = { 0, 0, 0 };
-				astar.e = { 0, 0, 0 };
-				break;
-			}
-
-			// 現在のノードをクローズリストに格納する
-			astar.close.node[astar.close.index++] = n;
-
-			// 左のノードを検索
-			if (n->x >= leftWall && map[n->x - 1][n->z] != objects->position)
-			{
-				astar.SearchNode(&astar.open, &astar.close, &astar.s, &astar.e, n,
-					astar.CreateNode(n->x - 1, n->z, n->cost + 1));
-			}
-
-			// 右のノードを検索
-			if (n->x <= rightWall && map[n->x + 1][n->z] != objects->position)
-			{
-				astar.SearchNode(&astar.open, &astar.close, &astar.s, &astar.e, n,
-					astar.CreateNode(n->x + 1, n->z, n->cost + 1));
-			}
-
-			// 前のノードを検索
-			if (n->z <= forwordWall && map[n->x][n->z + 1] != objects->position)
-			{
-				astar.SearchNode(&astar.open, &astar.close, &astar.s, &astar.e, n,
-					astar.CreateNode(n->x, n->z + 1, n->cost + 1));
-			}
-
-			// 後ろのノードを検索
-			if (n->z >= backWall && map[n->x][n->z - 1] != objects->position)
-			{
-				astar.SearchNode(&astar.open, &astar.close, &astar.s, &astar.e, n,
-					astar.CreateNode(n->x, n->z - 1, n->cost + 1));
-			}
-
-			if (loop++ > 1000)
-			{
-				printf("loop error...\n");
-				return false;
-			}
-		}
-	}
-	else if (moveCount < nodePoint)
-	{
-		
-		nodePos[moveCount].y = position.y;
-		glm::vec3 move = nodePos[moveCount] - position;
-		if (glm::dot(move, move))
-		{
-			// 向きを更新
-			move = glm::normalize(move);
-			rotation.y = std::atan2(-move.z, move.x) + glm::radians(90.0f);
-		}
-		if (NeraEquivalent(position, nodePos[moveCount], 0.5f))
-		{
-			nodePos[moveCount] = glm::vec3(0);
-			moveCount++;
-		}
-		else
-		{
-			velocity = move * (moveSpeed);
-		}
-		return false;
-	}
-	else
-	{
-		waitTimer = 5.0f;
-		velocity = glm::vec3(0);
-		task = Task::end;
-		isAnimation = false;
-		moveCount = 0;
-		nodePoint = 0;
-		loop = 0;
-		return true;
-	}
-	return false;
-}
-
-/*
 攻撃
 */
 bool EnemyActor::Attack(float delatTime)
 {
 	task = Task::start;
-	velocity = wait;
+	velocity = glm::vec3(0);
 
 	// アニメーションの変更
 	if (!isAnimation)
@@ -502,15 +210,21 @@ bool EnemyActor::Attack(float delatTime)
 		attackTimer = 0;
 		isAnimation = true;
 	}
-
+	glm::vec3 move = targetActor->position - position;
+	if (glm::dot(move, move))
+	{
+		// 向きを更新
+		move = glm::normalize(move);
+		rotation.y = std::atan2(-move.z, move.x) + glm::radians(90.0f);
+	}
 	// コリジョンを出す
-	if (attackTimer > 0.05f && attackTimer < 0.6f)
+	if (attackTimer > 0.5f && attackTimer < 0.9f)
 	{
 		if (!attackCollision)
 		{
-			static const float radian = 1.0f;
+			static const float radian = 0.5f;
 			const glm::vec3 front = glm::rotate(glm::mat4(1), rotation.y,
-				glm::vec3(0, 1, 0)) * glm::vec4(0, 0, 1.5f, 1);
+				glm::vec3(0, 1, 0)) * glm::vec4(0, 0, 1.0f, 1);
 			attackCollision = std::make_shared<Actor>("PlayerAttackCollision", 5,
 				position + front + glm::vec3(0, 1, 0), glm::vec3(0), glm::vec3(radian));
 			attackCollision->colLocal = Collision::CreateSphere(glm::vec3(0), radian);
@@ -525,7 +239,7 @@ bool EnemyActor::Attack(float delatTime)
 	if (attackTimer >= 1)
 	{
 		attackTimer = 0;
-		waitTimer = 5.0f;
+		waitTimer = 1.0f;
 		task = Task::end;
 		isAnimation = false;
 		return true;
@@ -537,9 +251,9 @@ bool EnemyActor::Attack(float delatTime)
 }
 
 /*
-近づく
+移動
 */
-bool EnemyActor::Approach()
+bool EnemyActor::MoveTo(glm::vec3 target, float length)
 {
 	// アニメーションの変更
 	if (!isAnimation)
@@ -547,36 +261,324 @@ bool EnemyActor::Approach()
 		GetMesh()->Play("Run");
 		isAnimation = true;
 	}
-
+	
+	Astar astar;
 	// タスクの初期化
 	if (task == Task::reserve)
 	{
-		patrolGoalPos = targetActor->position;
+		int goalPos_x = target.x;
+		int goalPos_z = target.z;
+		if ((target.x - goalPos_x) >= 0.5f)
+		{
+			goalPos_x += 1;
+		}
+		if ((target.z - goalPos_z) >= 0.5f)
+		{
+			goalPos_z += 1;
+		}
+
+		patrolGoalPos.y = position.y;
+		costChack = false;
+		loop = 0;
+		nodePoint = 0;
+		moveCount = 0;
+		astar.open.index = 0;
+		astar.close.index = 0;
+		for (x = leftWall; x < ARRAY_NUM(map); x++)
+		{
+			for (z = backWall; z <= forwordWall; z++)
+			{
+				// ノードのスタート地点を設定
+				if (x == goalPos_x && z == goalPos_z)
+				{
+					map[x][z] = glm::vec3(goalPos_x, position.y, goalPos_z);
+					map[x][z].y = heightMap->Height(map[x][z]);
+					astar.s.x = x;
+					astar.s.z = z;
+					// スタートノードをオープンリストに追加
+					astar.open.node[astar.open.index++] = &astar.s;
+					// クローズリストは空にする
+					astar.close.node[astar.close.index++] = NULL;
+				}
+
+				int position_x = position.x;
+				int position_z = position.z;
+
+				// ノードのゴール地点を設定
+				if (x == position_x && z == position_z)
+				{
+					map[x][z] = glm::vec3(x, 0, z);
+					map[x][z].y = heightMap->Height(map[x][z]);
+					goalPos = map[x][z]; // ゴール地点として変数に格納
+					astar.e.x = x;
+					astar.e.z = z;
+				}
+			}
+		}
 		task = Task::start;
 	}
 
-	// プレーヤーの近くに行ったらタスク終了
-	if (NeraEquivalent(position, patrolGoalPos, nearPlayer))
+	// 視界にプレイヤーが見えたらタスク終了
+	if (RayChack(front, 6) && !vigilanceMode
+		&& !discovery)
 	{
+		vigilanceMode = true;
 		velocity = glm::vec3(0);
-		task = Task::end;
+		state = State::wait;
+		waitTimer = 1.0f;
+		task = Task::reserve;
 		isAnimation = false;
-		return true;
+		return false;
 	}
-	// プレーヤーの位置まで移動
-	else
+	
+	if (NearPlayer())
 	{
-		patrolGoalPos = targetActor->position;
-		glm::vec3 move = patrolGoalPos - position;
+		vigilanceMode = false;
+		discovery = true;
+		state = State::attack;
+		nodePoint = 0;
+		moveCount = 0;
+		isAnimation = false;
+		task = Task::end;
+		return false;
+	}
+
+	if (nodePoint == 0)
+	{
+		while (1)
+		{
+			Astar::NODE* n = NULL;
+			n = astar.GetMinCost(n);
+			// openからリストがなくなったので終了する
+			if (n == NULL)
+			{
+				printf("no goal...\n");
+				return true;
+			}
+			map[n->x][n->z] = glm::vec3(n->x, position.y, n->z);
+			glm::vec3 v = map[n->x][n->z] - goalPos;
+			// 計算中にゴール地点に着いたら計算終了
+			if (dot(v,v) <= 1)
+			{
+				if (n != NULL && n->parent == NULL)
+				{
+					nodePos[nodePoint] = glm::vec3(n->x, 0, n->z);
+					nodePos[nodePoint].y = heightMap->Height(nodePos[nodePoint]);
+					nodePoint++;
+				}
+
+				// スタート地点のノードが無くなるまで各ノードの座標を配列に格納
+				while (n->parent != NULL)
+				{
+					if (n->cost >= n->parent->cost)
+					{
+						n = n->parent;
+						nodePos[nodePoint] = glm::vec3(n->x, 0, n->z);
+						nodePos[nodePoint].y = heightMap->Height(nodePos[nodePoint]);
+						nodePoint++;
+						if (nodePoint > 55)
+						{
+							printf("コストが大きすぎるため再度計算\n");
+							// 親ノードの空にする
+							n->parent = NULL;
+							costChack = true;
+						}
+					}
+
+					// 親ノードのコストが大きかった場合の例外処理
+					else if (n->cost < n->parent->cost)
+					{
+						printf("コストエラー\n");
+						// 親ノードの空にする
+						n->parent = NULL;
+						costChack = true;
+					}
+				}
+				n = NULL;
+				astar.s = { 0, 0, 0 };
+				astar.e = { 0, 0, 0 };
+				break;
+			}
+
+			// 現在のノードをクローズリストに格納する
+			astar.close.node[astar.close.index++] = n;
+
+			// 左のノードを検索
+			if (n->x > leftWall && MapCheck(n->x - 1, n->z))
+			{
+				astar.SearchNode(&astar.open, &astar.close, &astar.s, &astar.e, n,
+					astar.CreateNode(n->x - 1, n->z, n->cost + 1));
+			}
+
+			// 右のノードを検索
+			if (n->x < rightWall && MapCheck(n->x + 1, n->z))
+			{
+				astar.SearchNode(&astar.open, &astar.close, &astar.s, &astar.e, n,
+					astar.CreateNode(n->x + 1, n->z, n->cost + 1));
+			}
+
+			// 前のノードを検索
+			if (n->z < forwordWall && MapCheck(n->x, n->z + 1))
+			{
+				astar.SearchNode(&astar.open, &astar.close, &astar.s, &astar.e, n,
+					astar.CreateNode(n->x, n->z + 1, n->cost + 1));
+			}
+
+			// 後ろのノードを検索
+			if (n->z > backWall && MapCheck(n->x, n->z - 1))
+			{
+				astar.SearchNode(&astar.open, &astar.close, &astar.s, &astar.e, n,
+					astar.CreateNode(n->x, n->z - 1, n->cost + 1));
+			}
+			// 左前のノードを検索
+			if (n->x > leftWall && n->z < forwordWall && MapCheck(n->x - 1, n->z + 1))
+			{
+				astar.SearchNode(&astar.open, &astar.close, &astar.s, &astar.e, n,
+					astar.CreateNode(n->x - 1, n->z + 1, n->cost + 1));
+			}
+
+			// 右前のノードを検索
+			if (n->x < leftWall && n->z < forwordWall && MapCheck(n->x + 1, n->z + 1))
+			{
+				astar.SearchNode(&astar.open, &astar.close, &astar.s, &astar.e, n,
+					astar.CreateNode(n->x + 1, n->z + 1, n->cost + 1));
+			}
+
+			// 左後ろのノードを検索
+			if (n->x > leftWall && n->z > backWall && MapCheck(n->x - 1, n->z - 1))
+			{
+				astar.SearchNode(&astar.open, &astar.close, &astar.s, &astar.e, n,
+					astar.CreateNode(n->x - 1, n->z - 1, n->cost + 1));
+			}
+
+			// 右後ろのノードを検索
+			if (n->x < leftWall && n->z > backWall && MapCheck(n->x + 1, n->z - 1))
+			{
+				astar.SearchNode(&astar.open, &astar.close, &astar.s, &astar.e, n,
+					astar.CreateNode(n->x + 1, n->z - 1, n->cost + 1));
+			}
+
+			// ゴールにたどり着かず、永遠にノードの計算を行った場合の例外処理
+			if (loop++ > 1000)
+			{
+				printf("loop error...\n");
+				return true;
+			}
+		}
+	}
+	// 各ノードを辿るようにしてAIを動かす
+	if (moveCount < nodePoint)
+	{
+		nodePos[moveCount].y = position.y;
+		glm::vec3 move = nodePos[moveCount] - position;
 		if (glm::dot(move, move))
 		{
 			// 向きを更新
 			move = glm::normalize(move);
 			rotation.y = std::atan2(-move.z, move.x) + glm::radians(90.0f);
 		}
-		velocity = move * moveSpeed;
+		// ある一定の座標に着いたら次のノードの座標に移る
+		if (NeraEquivalent(position, nodePos[moveCount], 0.5f))
+		{
+			moveCount++;
+		}
+		else
+		{
+			// 移動処理
+			velocity = move * (moveSpeed);
+		}
+	}
+	// 格納したノードの数の分進んだらタスク終了
+	if (moveCount >= nodePoint)
+	{
+		// 親のコストが高かった場合の例外処理に引っかかった場合、タスクを終了せずノードの再計算を行う
+		if (costChack)
+		{
+			velocity = glm::vec3(0);
+			position = nodePos[nodePoint - 1];
+			task = Task::reserve;
+			return false;
+		}
+		if (glm::length(target - nodePos[moveCount]) > length && state == State::approach)
+		{
+			velocity = glm::vec3(0);
+			position = nodePos[nodePoint - 1];
+			task = Task::reserve;
+			return false;
+		}
+		roundPoint = 0;
+		velocity = glm::vec3(0);
+		task = Task::end;
+		waitTimer = 2.0f;
+		isAnimation = false;
+		return true;
+	}
+	return false;
+}
+
+bool EnemyActor::Vigilance()
+{
+	if (RayChack(front, 12))
+	{
+		vigilanceMode = false;
+		discovery = true;
+		rotateCount = 0;
+		state = State::approach;
+		task = Task::end;
+		isAnimation = false;
 		return false;
 	}
+
+	if (task == Task::reserve)
+	{
+		findRotation = rotation.y + glm::radians(90.0f);
+		task = Task::start;
+	}
+
+	if (rotateCount == 3)
+	{
+		rotateCount = 0;
+		return true;
+	}
+	else
+	{
+		if (rotateCount ==  0)
+		{
+			if ((findRotation - rotation.y) > FLT_EPSILON)
+			{
+				rotation.y += glm::radians(rotationSpeed);
+			}
+			else
+			{
+				rotateCount += 1;
+				findRotation = rotation.y + glm::radians(-180.0f);
+			}
+		}
+		else if (rotateCount == 1)
+		{
+			if ((findRotation - rotation.y) < FLT_EPSILON)
+			{
+				rotation.y -= glm::radians(rotationSpeed);
+			}
+			else
+			{
+				rotateCount += 1;
+				findRotation += glm::radians(90.0f);
+			}
+		}
+		else if (rotateCount == 2)
+		{
+			if ((findRotation - rotation.y) > FLT_EPSILON)
+			{
+				rotation.y += glm::radians(rotationSpeed);
+			}
+			else
+			{
+				rotateCount += 1;
+			}
+		}
+	}
+	return false;
 }
 
 // プレイヤーを視認できる範囲
@@ -651,4 +653,234 @@ void EnemyActor::SetBoardingActor(ActorPtr p)
 	boardingActor = p;
 }
 
+/*
+ノードの検索先に障害物があるかチェックする
 
+@param x 検索先のX座標
+@param z 検索先のZ座標
+
+@retrun true  障害物なし
+@param false 障害物あり
+*/
+bool EnemyActor::MapCheck(int x, int z)
+{
+	glm::vec3 map = glm::vec3(x , 0, z);
+	map.y = heightMap->Height(map);
+	for (auto& object : obstacle)
+	{
+		// オブジェクトとノードの距離を取得する
+		const glm::vec3 distance = ObjectChack(object, map); 
+
+		// オブジェクトと指定した座標の距離が重なっているか確認する
+		if (glm::length(distance) <= 0.8f)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+/*
+障害物のオブジェクトと指定した座標の距離（ベクトル）を調べる
+
+@param o 障害物（リスト）
+@param m 指定した座標(ノード、レイ)
+
+@return オブジェクトと指定した座標の距離（ベクトル）
+*/
+const glm::vec3 EnemyActor::ObjectChack(ActorPtr o, glm::vec3 m)
+{
+	// リストから一つのオブジェクトを取得
+	StaticMeshActorPtr p = std::static_pointer_cast<StaticMeshActor>(o);
+	// 指定した座標と障害物の中心点の距離(ベクトル)
+	const glm::vec3 d = m - p->colWorld.obb.center;
+	// 障害物の中心点の座標
+	glm::vec3 q = p->colWorld.obb.center;
+	// x,y,zの3軸を調べる
+	for (int i = 0; i < 3; i++)
+	{
+		// ベクトルと各軸の内積を調べる
+		float distance = dot(d, p->colWorld.obb.axis[i]);
+		if (distance >= p->colWorld.obb.e[i]) {
+			distance = p->colWorld.obb.e[i];
+		}
+		else if (distance <= -p->colWorld.obb.e[i]) {
+			distance = -p->colWorld.obb.e[i];
+		}
+		q += distance * p->colWorld.obb.axis[i];
+	}
+	return m - q;
+}
+
+/*
+格納可能なアクター数を確保する
+
+@param reserveCount アクター配列の確保数
+*/
+void EnemyActorList::Reserve(size_t reserveCount)
+{
+	enemies.reserve(reserveCount);
+}
+
+/*
+アクターを追加する
+
+@param actor 追加するアクター
+*/
+void EnemyActorList::Add(const EnemyActorPtr& actor)
+{
+	enemies.push_back(actor);
+}
+
+/*
+アクターを削除する
+
+@param actor 削除するアクター
+*/
+bool EnemyActorList::Remove(const EnemyActorPtr& actor)
+{
+	//ポインタが一致するアクタを探して
+	//見つかったら消す
+	for (auto itr = enemies.begin(); itr != enemies.end(); ++itr)
+	{
+		if (*itr == actor)
+		{
+			enemies.erase(itr);
+			return true;
+		}
+	}
+	return false;
+}
+
+/*
+指定された座標に対応する格子のインデックスを取得する
+
+@param pos インデックスの元になる位置
+
+@retun posに対応する格子のインデックス
+*/
+glm::ivec2 EnemyActorList::CalcMapIndex(const glm::vec3& pos) const
+{
+	const int x = std::max(0,
+		std::min(sepalationSizeX - 1, static_cast<int>(pos.x / mapGridSizeX)));
+	const int y = std::max(0,
+		std::min(sepalationSizeY - 1, static_cast<int>(pos.z / mapGridSizeY)));
+	return glm::ivec2(x, y);
+}
+
+/*
+アクターの状態を更新する
+
+@param deltaTime 前回の更新からの経過時間
+*/
+void EnemyActorList::Update(float deltaTime)
+{
+	//範囲for文
+	for (const EnemyActorPtr& e : enemies)
+	{
+		if (e && e->health > 0)
+		{
+			e->Update(deltaTime);
+		}
+	}
+
+	for (auto i = enemies.begin(); i != enemies.end();)
+	{
+		const EnemyActorPtr& e = *i;
+		if (!e || e->health <= 0)
+		{
+			// erase => vectorから要素を削除するために使う
+			// 実行後、次の要素を指す値を返してくれる
+			i = enemies.erase(i);
+		}
+		else
+		{
+			++i;
+		}
+	}
+
+	// 格子空間にアクターを割り当てる
+	for (int y = 0; y < sepalationSizeY; ++y)
+	{
+		for (int x = 0; x < sepalationSizeX; ++x)
+		{
+			grid[y][x].clear();
+		}
+	}
+	for (auto i = enemies.begin(); i != enemies.end(); ++i)
+	{
+		const glm::ivec2 mapIndex = CalcMapIndex((*i)->position);
+		grid[mapIndex.y][mapIndex.x].push_back(*i);
+	}
+}
+
+
+
+/*
+アクターを描画データを更新する
+*/
+void EnemyActorList::UpdateDrawData(float deltaTime)
+{
+	for (const EnemyActorPtr& e : enemies)
+	{
+		if (e && e->health > 0) {
+			e->UpdateDrawData(deltaTime);
+		}
+	}
+}
+
+/*
+アクターを描画する
+*/
+void EnemyActorList::Draw()
+{
+	for (const EnemyActorPtr& e : enemies)
+	{
+		if (e && e->health > 0) {
+			e->Draw();
+		}
+	}
+}
+
+/*
+指定された座標の近傍にあるアクターのリストを取得する
+
+@param pos         検索の基点となる座標
+@param maxDistance 近傍とみなす最大距離(ｍ)
+
+@return Actor::positionがposから半径maxDistance以内にあるアクターの配列
+*/
+std::vector<EnemyActorPtr> EnemyActorList::FindNearbyActors(
+	const glm::vec3& pos, float maxDistance) const
+{
+	std::vector<std::pair<float, EnemyActorPtr>> buffer;
+	buffer.reserve(1000);
+
+	const glm::ivec2 mapIndex = CalcMapIndex(pos);
+	const glm::ivec2 min = glm::max(mapIndex - 1, 0);
+	const glm::ivec2 max = glm::min(
+		mapIndex + 1, glm::ivec2(sepalationSizeX - 1, sepalationSizeY - 1));
+	for (int y = min.y; y <= max.y; ++y)
+	{
+		for (int x = min.x; x <= max.x; ++x)
+		{
+			const std::vector<EnemyActorPtr>& list = grid[y][x];
+			for (auto actor : list)
+			{
+				const float distance = glm::distance(glm::vec3(actor->position), pos);
+				buffer.push_back(std::make_pair(distance, actor));
+			}
+		}
+	}
+
+	std::vector<EnemyActorPtr> result;
+	result.reserve(100);
+	for (const auto& e : buffer)
+	{
+		if (e.first <= maxDistance)
+		{
+			result.push_back(e.second);
+		}
+	}
+	return result;
+}

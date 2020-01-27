@@ -1,5 +1,7 @@
 #ifndef ASTAR_H_INCLUDED
 #define ASRAR_H_INCLUDED
+#include <glm/glm.hpp>
+
 #define NODE_MAX 1000
 
 class Astar
@@ -26,11 +28,16 @@ public:
 	int H(NODE *e, NODE *n);
 	void SearchNode(LIST *open, LIST *close, NODE *s,
 		NODE *e, NODE *n, NODE *m);
+	
+	NODE* GetMinCost(NODE *n);
+	glm::vec3 CreateRoute(NODE *n);
 
 	NODE s = { 0, 0, 0 };
 	NODE e = { 0, 0, 0 };
 	LIST open;
 	LIST close;
+
+	bool costError = false;
 
 private:
 

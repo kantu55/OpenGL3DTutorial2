@@ -33,9 +33,6 @@
     <ClInclude Include="Src\Scene.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Src\stdafx.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="Src\GLFWEW.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -105,6 +102,12 @@
     <ClInclude Include="Src\Astar.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="Src\stdafx.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Src\LoiteringEnemy.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Src\TitleScene.cpp">
@@ -120,9 +123,6 @@
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="Src\Scene.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Src\stdafx.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="Src\OpenGL3DTutorial2.cpp">
@@ -191,6 +191,12 @@
     <ClCompile Include="Src\Astar.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="Src\stdafx.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\LoiteringEnemy.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -219,6 +225,12 @@
       <Filter>リソース ファイル</Filter>
     </None>
     <None Include="Res\DepthOfField.frag">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="Res\SkeletalMesh.frag">
+      <Filter>リソース ファイル</Filter>
+    </None>
+    <None Include="Res\SkeletalMesh.vert">
       <Filter>リソース ファイル</Filter>
     </None>
   </ItemGroup>

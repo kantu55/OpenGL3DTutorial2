@@ -17,23 +17,12 @@ bool TitleScene::Initialize()
 	spriteRenderer.Init(1000, "Res/Sprite.vert", "Res/Sprite.frag");
 	sprites.reserve(100);
 	Sprite spr(Texture::Image2D::Create("Res/ActionTitleBg.dds"));
+	spr.Scale(glm::vec2(1.5));
 	sprites.push_back(spr);
-
-	Sprite buttonNone(Texture::Image2D::Create("Res/ButtonNone.tga"));
-	buttonNone.Scale(glm::vec2(0.25f));
-	buttonNone.Position(glm::vec3(200, -200, -2));
-	sprites.push_back(buttonNone);
-
-	Sprite buttonActive(Texture::Image2D::Create("Res/ButtonActive.tga"));
-	buttonActive.Scale(glm::vec2(0.25f));
-	buttonActive.Position(glm::vec3(-200, -200, -2));
-	sprites.push_back(buttonActive);
-	
 
 	// BGMを再生する
 	bgm = Audio::Engine::Instance().Prepare("Res/Audio/Title.mp3");
 	bgm->Play(Audio::Flag_Loop);
-
 	fontRenderer.Init(1000);
 	fontRenderer.LoadFromFile("Res/font.fnt");
 
@@ -53,35 +42,7 @@ void TitleScene::ProcessInput()
 		se->SetVolume(0.1f);
 		se->Play();
 		timer = 0.5f;
-	}
-	if (window.GetGamePad().buttonDown & GamePad::DPAD_LEFT)
-	{
-		menu = Menu::start;
-		Sprite buttonNone(Texture::Image2D::Create("Res/ButtonNone.tga"));
-		buttonNone.Scale(glm::vec2(0.25f));
-		buttonNone.Position(glm::vec3(200, -200, -2));
-		sprites.push_back(buttonNone);
-
-		Sprite buttonActive(Texture::Image2D::Create("Res/ButtonActive.tga"));
-		buttonActive.Scale(glm::vec2(0.25f));
-		buttonActive.Position(glm::vec3(-200, -200, -2));
-		sprites.push_back(buttonActive);
-
-	}
-	if (window.GetGamePad().buttonDown & GamePad::DPAD_RIGHT)
-	{
-		menu = Menu::end;
-		Sprite buttonNone(Texture::Image2D::Create("Res/ButtonNone.tga"));
-		buttonNone.Scale(glm::vec2(0.25f));
-		buttonNone.Position(glm::vec3(-200, -200, -2));
-		sprites.push_back(buttonNone);
-
-		Sprite buttonActive(Texture::Image2D::Create("Res/ButtonActive.tga"));
-		buttonActive.Scale(glm::vec2(0.25f));
-		buttonActive.Position(glm::vec3(200, -200, -2));
-		sprites.push_back(buttonActive);
-	}
-	
+	}	
 }
 
 /*
@@ -104,8 +65,8 @@ void TitleScene::Update(float deltaTime)
 	const float lineHenght = fontRenderer.LineHeight();
 	fontRenderer.BeginUpdate();
 	//文字列を指定するときに先頭に「L」を付けると「UTF-16」文字列としてビルドされる
-	fontRenderer.AddString(glm::vec2(-w * 0.5f + 32, h * 0.5f - lineHenght), L"タイトル画面");
-	fontRenderer.AddString(glm::vec2(-128, 0), L"アクションゲーム");
+	fontRenderer.AddString(glm::vec2(-128, 0), L"ステルスゲーム");
+	fontRenderer.AddString(glm::vec2(-130, -200), L"Press Enter Button");
 	fontRenderer.EndUpdate();
 
 	// シーン切り替え待ち

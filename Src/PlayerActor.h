@@ -46,7 +46,11 @@ private:
 	float attackTimer = 0;     // UŒ‚ŠÔ
 
 	const Terrain::HeightMap* heightMap = nullptr;
-
+public:
+	bool debugFrag = false;
+	glm::mat4 velocityRotY;
+	float cameraRotate; // ƒJƒƒ‰‚ªŒü‚¢‚Ä‚¢‚é•ûŒü
+	glm::vec3 cameraPosition;
 };
 using PlayerActorPtr = std::shared_ptr<PlayerActor>;
 

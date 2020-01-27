@@ -6,6 +6,7 @@
 #include <GL\glew.h>
 #include "GamePad.h"
 #include <GLFW\glfw3.h>
+#include <glm\vec3.hpp>
 
 namespace GLFWEW
 {
@@ -58,6 +59,11 @@ namespace GLFWEW
 		bool IsMousePressed(int mouse) const;
 		void CursorPos(double mousex, double mousey) const;
 		const GamePad& GetGamePad() const;
+		glm::vec3 CursorPos() const;
+		void CenterCursor() const;
+
+		float windowWidth = 1920;
+		float windowHeight = 1080;
 	};
 } // namespace GLFEEW
 

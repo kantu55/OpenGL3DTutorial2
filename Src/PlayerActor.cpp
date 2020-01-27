@@ -30,12 +30,12 @@ void PlayerActor::Update(float deltaTime)
 	{
 		attackCollision->Update(deltaTime);
 	}
-
+	
 	// 見えない壁判定
-	const float rightWall = 115.0f;
-	const float leftWall = 85.0f;
-	const float forwordWall = 100.0f;
-	const float backWall = 70.0f;
+	const float rightWall = 110.0f;
+	const float leftWall = 87.0f;
+	const float forwordWall = 98.0f;
+	const float backWall = 71.0f;
 	if (position.x >= rightWall)
 	{
 		position.x = rightWall;
@@ -219,11 +219,7 @@ void PlayerActor::ProcessInput()
 {
 	const GamePad gamepad = GLFWEW::Window::Instance().GetGamePad();
 	CheckRun(gamepad);
-	CheckJump(gamepad);
-	CheckAttack(gamepad);
 }
-
-
 
 /*
 プレイヤーが乗っている物体を設定する
@@ -251,35 +247,191 @@ void PlayerActor::CheckRun(const GamePad& gamepad)
 	{
 		return;
 	}
-
+	 
+	float forwardSpeed = 0.0f;
+	float rightSpeed = 0.0f;
 	// 方向キーから移動方向を計算
 	const glm::vec3 front(0, 0, -1);
 	const glm::vec3 left(-1, 0, 0);
 	glm::vec3 move(0);
-	if (gamepad.buttons & GamePad::DPAD_UP)
+
+	if (debugFrag)
 	{
-		move += front;
+		if (gamepad.buttons & GamePad::DPAD_UP)
+		{
+			move += front;
+		}
+		else if (gamepad.buttons & GamePad::DPAD_DOWN)
+		{
+			move -= front;
+		}
+		if (gamepad.buttons & GamePad::DPAD_LEFT)
+		{
+			move += left;
+		}
+		else if (gamepad.buttons & GamePad::DPAD_RIGHT)
+		{
+			move -= left;
+		}
 	}
-	else if (gamepad.buttons & GamePad::DPAD_DOWN)
+	else
 	{
-		move -= front;
-	}
-	if (gamepad.buttons & GamePad::DPAD_LEFT)
-	{
-		move += left;
-	}
-	else if (gamepad.buttons & GamePad::DPAD_RIGHT)
-	{
-		move -= left;
+		glm::vec3 vfront = velocityRotY * glm::vec4(0, 0, 1, 1);
+		glm::vec3 vleft = velocityRotY * glm::vec4(1, 0, 0, 1);
+		/*
+		if (cameraRotate < 0.0f)
+		{
+			cameraRotate *= -1.0f;
+		}
+		if (cameraRotate > 360.0f)
+		{
+			int rotate = cameraRotate;
+			cameraRotate = rotate % 360;
+		}
+		*/
+		printf("%.2f\n", cameraRotate);
+		cameraRotate = glm::radians(cameraRotate);
+		if (gamepad.buttons & GamePad::DPAD_UP && gamepad.buttons & GamePad::DPAD_LEFT)
+		{
+			move += (vfront + vleft);
+			// カメラの向いてい方向(+進む方向)とキャラクターの方向の差が±1度になるまで回転
+			if (rotation.y - (cameraRotate + glm::radians(45.0f)) > glm::radians(0.0f))
+			{
+				rotation.y = cameraRotate + glm::radians(45.0f);
+				//rotation.y += glm::radians(7.5f);
+			}
+			else if (rotation.y - (cameraRotate + glm::radians(45.0f)) < glm::radians(0.0f))
+			{
+				rotation.y = cameraRotate + glm::radians(45.0f);
+				//rotation.y += glm::radians(-7.5f);
+			}
+			else
+			{
+				rotation.y = cameraRotate + glm::radians(45.0f);
+			}
+		}
+		else if (gamepad.buttons & GamePad::DPAD_UP && gamepad.buttons & GamePad::DPAD_RIGHT)
+		{
+			move += (vfront - vleft);
+			if (rotation.y - (cameraRotate + glm::radians(-45.0f)) > glm::radians(0.0f))
+			{
+				rotation.y = cameraRotate + glm::radians(-45.0f);
+				//rotation.y += glm::radians(7.5f);
+			}
+			else if (rotation.y - (cameraRotate + glm::radians(-45.0f)) < glm::radians(0.0f))
+			{
+				rotation.y = cameraRotate + glm::radians(-45.0f);
+				//rotation.y += glm::radians(-7.5f);
+			}
+			else
+			{
+				rotation.y = cameraRotate + glm::radians(-45.0f);
+			}
+		}
+		else if (gamepad.buttons & GamePad::DPAD_DOWN && gamepad.buttons & GamePad::DPAD_LEFT)
+		{
+			move += (-vfront + vleft);
+			if (rotation.y - (cameraRotate + glm::radians(135.0f)) > glm::radians(0.0f))
+			{
+				rotation.y = cameraRotate + glm::radians(135.0f);
+				//rotation.y += glm::radians(7.5f);
+			}
+			else if (rotation.y - (cameraRotate + glm::radians(135.0f)) < glm::radians(0.0f))
+			{
+				rotation.y = cameraRotate + glm::radians(135.0f);
+				//rotation.y += glm::radians(-7.5f);
+			}
+			else
+			{
+				rotation.y = cameraRotate + glm::radians(135.0f);
+			}
+		}
+		else if (gamepad.buttons & GamePad::DPAD_DOWN && gamepad.buttons & GamePad::DPAD_RIGHT)
+		{
+			move += (-vfront - vleft);
+			if (rotation.y - (cameraRotate + glm::radians(-135.0f)) > glm::radians(0.0f))
+			{
+				rotation.y = cameraRotate + glm::radians(-135.0f);
+				//rotation.y += glm::radians(7.5f);
+			}
+			else if (rotation.y - (cameraRotate + glm::radians(-135.0f)) < glm::radians(0.0f))
+			{
+				rotation.y = cameraRotate + glm::radians(-135.0f);
+				//rotation.y += glm::radians(-7.5f);
+			}
+			else
+			{
+				rotation.y = cameraRotate + glm::radians(-135.0f);
+			}
+		}
+		else if (gamepad.buttons & GamePad::DPAD_UP)
+		{
+			move += vfront;
+			if (rotation.y - cameraRotate < glm::radians(0.0f))
+			{
+				rotation.y = cameraRotate;
+				//rotation.y += glm::radians(7.5f);
+			}
+			else if (rotation.y - cameraRotate > glm::radians(0.0f))
+			{
+				rotation.y = cameraRotate;
+				//rotation.y -= glm::radians(7.5f);
+			}
+		}
+		else if (gamepad.buttons & GamePad::DPAD_DOWN)
+		{
+			move -= vfront;
+			if (rotation.y - (cameraRotate + glm::radians(180.0f)) > glm::radians(0.0f))
+			{
+				rotation.y = cameraRotate + glm::radians(180.0f);
+				//rotation.y += glm::radians(7.5f);
+			}
+			else if (rotation.y - (cameraRotate + glm::radians(180.0f)) < glm::radians(0.0f))
+			{
+				rotation.y = cameraRotate + glm::radians(180.0f);
+				//rotation.y += glm::radians(-7.5f);
+			}
+		}
+		else if (gamepad.buttons & GamePad::DPAD_LEFT)
+		{
+			move += vleft;
+			if (rotation.y - (cameraRotate + glm::radians(90.0f)) > glm::radians(0.0f))
+			{
+				rotation.y = cameraRotate + glm::radians(90.0f);
+				//rotation.y += glm::radians(7.5f);
+			}
+			else if (rotation.y - (cameraRotate + glm::radians(90.0f)) < glm::radians(0.0f))
+			{
+				rotation.y = cameraRotate + glm::radians(90.0f);
+				//rotation.y += glm::radians(-7.5f);
+			}
+		}
+		else if (gamepad.buttons & GamePad::DPAD_RIGHT)
+		{
+			move -= vleft;
+			if (rotation.y - (cameraRotate + glm::radians(-90.0f)) < glm::radians(0.0f))
+			{
+				rotation.y = cameraRotate + glm::radians(-90.0f);
+				//rotation.y += glm::radians(-7.5f);
+			}
+			else if (rotation.y - (cameraRotate + glm::radians(-90.0f)) > glm::radians(0.0f))
+			{
+				rotation.y = cameraRotate + glm::radians(-90.0f);
+				//rotation.y += glm::radians(7.5f);
+			}
+		}
 	}
 
 	// 移動が行われていたら、移動方向に応じて向きと速度を更新
 	if (glm::dot(move, move))
 	{
-		// 向きを更新
-		move = glm::normalize(move);
-		rotation.y = std::atan2(-move.z, move.x) + glm::radians(90.0f);
-
+		if (debugFrag)
+		{
+			// 向きを更新
+			move = glm::normalize(move);
+			rotation.y = std::atan2(-move.z, move.x) + glm::radians(90.0f);
+		}
+		
 		// 物体に乗っていないときは地形の勾配を考慮して移動方向を調整する
 		if (!boardingActor)
 		{

@@ -67,6 +67,7 @@ namespace GLFWEW
 			std::cerr << "ERROR: GLFWEWはすでに初期化されています." << std::endl;
 			return false;
 		}
+
 		if (!isGLFWInitialized)
 		{
 			glfwSetErrorCallback(ErrorCallback);
@@ -89,6 +90,8 @@ namespace GLFWEW
 			//指定したウィンドウに対応するOpenGLコンテキストを描画対象に設定する
 			glfwMakeContextCurrent(window);
 		}
+
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 		if (glewInit() != GLEW_OK)
 		{
@@ -380,4 +383,21 @@ namespace GLFWEW
 		gamepad.buttonDown = gamepad.buttons & ~prevButtos;
 	}
 
+	void Window::CenterCursor() const
+	{
+		glfwSetCursorPos(window, width / 2, height / 2);
+	}
+
+	glm::vec3 Window::CursorPos() const
+	{
+		glm::vec3 mousePos = glm::vec3(0);
+		double x, z;
+		glfwGetCursorPos(window, &x, &z);
+		{
+			mousePos.x = x * 0.05f;
+			mousePos.z = z * 0.25f;
+		}
+		mousePos.y = 0;
+		return mousePos;
+	}
 }//namespace GLFWEW

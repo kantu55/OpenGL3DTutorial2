@@ -10,6 +10,7 @@
 #include "Actor.h"
 #include "PlayerActor.h"
 #include "Enemy.h"
+#include "LoiteringEnemy.h"
 #include "JizoActor.h"
 #include "Light.h"
 #include "FramebufferObject.h"
@@ -19,7 +20,6 @@
 /*
 メインゲーム画面
 */
-
 class MainGameScene : public Scene
 {
 public:
@@ -33,6 +33,13 @@ public:
 	virtual void Finalize() override {}
 
 	bool HandleJizoEffects(int id, const glm::vec3& pos);
+	StaticMeshActorPtr CreateTreeWall(glm::vec3 pos, int axsis, int size);
+	StaticMeshActorPtr CreateStoneWall(glm::vec3 pos, float rot, int axsis, int size);
+	bool ClearPositionFrag(glm::vec3 playerPos, glm::vec3 pos);
+	bool CameraRayChack(glm::mat4 front, int z);
+	const glm::vec3 ObjectChack(ActorPtr, glm::vec3);
+	bool enemyValid = false;
+	bool relayFrag = false;
 
 	//プレイヤーのカメラ位置と注視点
 	glm::vec3 viewPos;
@@ -46,6 +53,18 @@ public:
 	glm::vec3 cameraVelocity;
 	glm::vec3 TragetVelocity;
 
+	enum GameState
+	{
+		play,
+		clear,
+		over,
+	};
+	GameState state = GameState::play;
+
+	int Axsis; // 0 = x, 1 = z
+	float cameraRotate;
+	float cameraRadius = 0;
+
 private:
 	bool flag = false;
 	std::mt19937 rand;
@@ -56,12 +75,25 @@ private:
 	FontRenderer fontRenderer;
 	Mesh::Buffer meshBuffer;
 	Terrain::HeightMap heightMap;
+	const int x = 0;
+	const int z = 1;
+	Sprite map;
+	Sprite sprEnemy;
+	glm::vec3 sprEnemyPos = glm::vec3(-425, 1345, 0);
+	Sprite sprPlayer;
+	Sprite sprSikaku;
+	Sprite sprWall;
+	Sprite sprJizo;
+	Sprite sprGoal;
+	Sprite sprVigilance;
+	Sprite sprDiscovery;
 
+	FontRenderer fntJizo;
 
 	struct Camera
 	{
-		glm::vec3 target = glm::vec3(100, 0, 100);
-		glm::vec3 position = glm::vec3(100, 50, 150);
+		glm::vec3 target = glm::vec3(100, 0, 85);
+		glm::vec3 position = glm::vec3(100, 50, 86);
 		glm::vec3 up = glm::vec3(0, 1, 0);
 		glm::vec3 velocity = glm::vec3(0);
 
@@ -75,6 +107,7 @@ private:
 		float fNumber = 1.4f; // エフ・ナンバー = カメラのF値
 		float fov = glm::radians(60.0f); // フィールド・オブ・ビュー = カメラの視野角(ラジアン)
 		float sensorSize = 36.0f; // フォーカル・プレーン = ピントの合う距離
+		int camera_z = -4;
 		
 		// Update関数で計算するパラメータ
 		float focalLength = 50.0f; // フォーカル・レングス = 焦点距離(ミリ)
@@ -85,14 +118,26 @@ private:
 	};
 	Camera camera;
 
+	enum CameraState
+	{
+		playcamera,
+		debug
+	};
+	CameraState c_state = CameraState::playcamera;
+
 	EnemyActorPtr enemy;
 	PlayerActorPtr player;
+	LoiteringEnemyPtr L_enemy;
 	
-	ActorList enemies;
+	EnemyActorList enemies;
+	LoiteringEnemyList L_enemies;
 	ActorList objects;
+	ActorList tree;
 
 	LightBuffer lightBuffer;
 	ActorList lights;
+
+
 	FramebufferObjectPtr fboMain;
 };
 

@@ -105,3 +105,41 @@ void Astar::SearchNode(LIST *open, LIST *close, NODE *s,
 		}
 	}
 }
+
+Astar::NODE* Astar::GetMinCost(Astar::NODE *n)
+{
+	for (int x = 0; x < open.index; x++)
+	{
+		if (open.node[x] != NULL)
+		{
+			int cost = open.node[x]->cost;
+			if (n == NULL || n->cost > cost)
+			{
+				// ノードの中で一番最小のコストを得る
+				n = open.node[x];
+				open.node[x] = NULL;
+			}
+		}
+	}
+	return n;
+}
+
+glm::vec3  Astar::CreateRoute(Astar::NODE *n)
+{
+	glm::vec3 p;
+	costError = false;
+	if (n->cost >= n->parent->cost)
+	{
+		n = n->parent;
+		p = glm::vec3(n->x, 0, n->z);
+	}
+	// 親ノードのコストが大きかった場合の例外処理
+	else if (n->cost < n->parent->cost)
+	{
+		printf("コストエラー\n");
+		// 親ノードの空にする
+		n->parent = NULL;
+		costError = true;
+	}
+	return p;
+}
